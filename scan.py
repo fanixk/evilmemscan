@@ -5,8 +5,11 @@ import volatility.addrspace as addrspace
 import volatility.plugins.taskmods as taskmods
 import volatility.plugins.filescan as filescan
 import volatility.plugins.connscan as connscan
+import volatility.plugins.sockets as sockets
+import volatility.plugins.sockscan as sockscan
 import volatility.plugins.connections as connections
 import volatility.utils as utils
+import volatility.protos as protos
 from geoip import geolite2
 from process_rules import rules
 
@@ -39,6 +42,7 @@ def get_diffs(list, scan):
     differences = [scan[diff] for diff in (scan_addrs - list_addrs)]
     return differences
 
+
 def scanner(scan_module, scan_method):
     scanner = getattr(scan_module, scan_method)(config)
     scan = dict((res.obj_offset, res) for res in scanner.calculate())
@@ -68,6 +72,7 @@ def check_instances(list):
 
     return possible_infections
 #
+
 def main():
     init_volatility_config()
 
@@ -76,7 +81,8 @@ def main():
 
     process_diffs = get_diffs(pslist, psscan)
     for diff in process_diffs:
-        print '%s: %s' %(diff.ImageFileName, diff.UniqueProcessId)
+        print 'Possible malware at process %s with PID %s. (pslist-psscan difference)' \
+            %(diff.ImageFileName, diff.UniqueProcessId)
 
     conns = lister(connections, 'Connections')
     connscanner = scanner(connscan, 'ConnScan')
@@ -85,9 +91,20 @@ def main():
 
     for diff in conn_diffs:
         ip = str(diff.RemoteIpAddress)
-        match = geolite2.lookup(ip)
-        print match.country
-        print '%s: %s' %(ip, diff.RemotePort)
+        port = diff.RemotePort
+        country = geolite2.lookup(ip).country
+        print 'Possible malicious connection at %s: %s (Country: %s)' %(ip, port, country)
+
+    socks = lister(sockets, 'Sockets')
+    sockscanner = scanner(sockscan, 'SockScan')
+
+    sock_diffs = get_diffs(socks, sockscanner)
+
+    # print protos.protos
+    for diff in sock_diffs:
+        protocol = protos.protos.get(diff.Protocol.v(), '-')
+        print 'Possible malicious socket connection from Address-%s, Port-%s, Protocol-%s, PID-%s at %s' \
+                %(diff.LocalIpAddress, diff.LocalPort, protocol, diff.Pid, diff.CreateTime)
 
     possible_infections = check_instances(psscan)
     for inf in possible_infections:
