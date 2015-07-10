@@ -41,14 +41,13 @@ def get_diffs(list, scan):
 
 def scanner(scan_module, scan_method):
     scanner = getattr(scan_module, scan_method)(config)
-
-    scan = dict((addr_space.vtop(res.obj_offset), res) for res in scanner.calculate())
+    scan = dict((res.obj_offset, res) for res in scanner.calculate())
     return scan
 
 
 def lister(list_module, list_method):
     lister = getattr(list_module, list_method)(config)
-    list = dict((res.obj_offset, res) for res in lister.calculate())
+    list = dict((addr_space.vtop(res.obj_offset), res) for res in lister.calculate())
     return list
 
 
@@ -77,7 +76,7 @@ def main():
 
     process_diffs = get_diffs(pslist, psscan)
     for diff in process_diffs:
-        print diff.ImageFileName + ': ' + str(diff.UniqueProcessId)
+        print '%s: %s' %(diff.ImageFileName, diff.UniqueProcessId)
 
     conns = lister(connections, 'Connections')
     connscanner = scanner(connscan, 'ConnScan')
@@ -85,11 +84,12 @@ def main():
     conn_diffs = get_diffs(conns, connscanner)
 
     for diff in conn_diffs:
-        match = geolite2.lookup(str(diff.RemoteIpAddress))
+        ip = str(diff.RemoteIpAddress)
+        match = geolite2.lookup(ip)
         print match.country
-        print diff.RemoteIpAddress + ':' + str(diff.RemotePort)
+        print '%s: %s' %(ip, diff.RemotePort)
 
-    possible_infections = check_instances(pslist)
+    possible_infections = check_instances(psscan)
     for inf in possible_infections:
         print inf
 
