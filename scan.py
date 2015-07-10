@@ -8,6 +8,7 @@ import volatility.plugins.connscan as connscan
 import volatility.plugins.connections as connections
 import volatility.utils as utils
 from geoip import geolite2
+from process_rules import rules
 
 config = conf.ConfObject()
 addr_space = {}
@@ -25,12 +26,12 @@ def init_volatility_config():
     addr_space = utils.load_as(config)
 
 
-def base_diffscanner(list_module, list_method, scan_module, scan_method):
-    lister = getattr(list_module, list_method)(config)
-    scanner = getattr(scan_module, scan_method)(config)
-
-    list = dict((res.obj_offset, res) for res in lister.calculate())
-    scan = dict((addr_space.vtop(res.obj_offset), res) for res in scanner.calculate())
+def get_diffs(list, scan):
+    # if scan_module == 'PSList':
+    #     for i in scanner.calculate():
+    #         print i.ImageFileName
+    #         print i.InheritedFromUniqueProcessId
+    #         print i.CreateTime
 
     list_addrs = set(list.keys())
     scan_addrs = set(scan.keys())
@@ -38,19 +39,62 @@ def base_diffscanner(list_module, list_method, scan_module, scan_method):
     differences = [scan[diff] for diff in (scan_addrs - list_addrs)]
     return differences
 
+def scanner(scan_module, scan_method):
+    scanner = getattr(scan_module, scan_method)(config)
 
+    scan = dict((addr_space.vtop(res.obj_offset), res) for res in scanner.calculate())
+    return scan
+
+
+def lister(list_module, list_method):
+    lister = getattr(list_module, list_method)(config)
+    list = dict((res.obj_offset, res) for res in lister.calculate())
+    return list
+
+
+def check_instances(list):
+    instances = dict()
+    processes = [str(item.ImageFileName) for item in list.values()]
+    possible_infections = []
+
+    for i in list:
+        process_name = str(list[i].ImageFileName)
+        # pid = list[i].UniqueProcessId
+        # print process_name, pid, processes.count(process_name)
+        instances[process_name] = processes.count(process_name)
+
+    for ps in instances:
+        if rules.has_key(ps) and rules[ps]['instances'] != instances[ps]:
+            possible_infections.append(ps)
+
+    return possible_infections
+#
 def main():
     init_volatility_config()
 
-    diffs = base_diffscanner(taskmods, 'PSList', filescan, 'PSScan')
-    for diff in diffs:
+    pslist = lister(taskmods, 'PSList')
+    psscan = scanner(filescan, 'PSScan')
+
+    process_diffs = get_diffs(pslist, psscan)
+    for diff in process_diffs:
         print diff.ImageFileName + ': ' + str(diff.UniqueProcessId)
 
-    diffs = base_diffscanner(connections, 'Connections', connscan, 'ConnScan')
-    for diff in diffs:
+    conns = lister(connections, 'Connections')
+    connscanner = scanner(connscan, 'ConnScan')
+
+    conn_diffs = get_diffs(conns, connscanner)
+
+    for diff in conn_diffs:
         match = geolite2.lookup(str(diff.RemoteIpAddress))
         print match.country
         print diff.RemoteIpAddress + ':' + str(diff.RemotePort)
+
+    possible_infections = check_instances(pslist)
+    for inf in possible_infections:
+        print inf
+
+    # for i in rules:
+    #     print rules[i]['start_time']
 
 if __name__== '__main__':
     main()
