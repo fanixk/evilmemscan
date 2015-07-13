@@ -98,7 +98,8 @@ def main():
         ip = str(diff.RemoteIpAddress)
         port = diff.RemotePort
         country = geolite2.lookup(ip).country
-        print 'Possible malicious connection at %s: %s (Country: %s)' %(ip, port, country)
+        print 'Possible malicious connection from %s:%s to %s:%s (Country: %s)' \
+              %(diff.LocalIpAddress, diff.LocalPort, ip, port, country)
 
     # Get sockets-sockscan differences
     socks = lister(sockets, 'Sockets')
