@@ -63,7 +63,7 @@ def check_instances(list):
         # pid = list[i].UniqueProcessId
         # ppid = list[i].InheritedFromUniqueProcessId
         # start_time = list[i].CreateTime
-        # print process_name, pid, processes.count(process_name)
+        # print process_name, pid, ppid, start_time, processes.count(process_name)
 
         # calc number of process instances and save it in a dictionary
         instances[process_name] = processes.count(process_name)
