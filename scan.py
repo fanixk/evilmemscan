@@ -124,6 +124,17 @@ def main():
     if not hive_diffs:
         print 'No differences found between hivelist and hivescan'
 
+
+    # Check number of process running instances
+    ins = psscan or pslist
+    possible_infections = check_instances(ins)
+    for inf in possible_infections:
+        print 'Invalid number of process instances %s' %(inf)
+
+    if not possible_infections:
+        print 'Valid number of process instances.'
+
+
     # check for valid win7 or win8 profile
     if not netscan.Netscan.is_valid_profile(addr_space.profile):
         print 'Invalid Profile'
@@ -136,25 +147,20 @@ def main():
         local_port = str(conn[3])
         remote_ip = str(conn[4])
         remote_port = str(conn[5])
+        country = 'N/A' # init not available country lookup
 
-        if remote_ip is '*':
+        # skip unnecessary remote ips
+        if remote_ip is '*' or remote_ip.startswith('0') or remote_ip.startswith(':'):
             continue
 
         lookup = geolite2.lookup(remote_ip)
         if lookup is not None:
             country = lookup.country
-            print 'Connection from %s:%s to %s:%s (Country: %s)' \
-              %(local_ip, local_port, remote_ip, remote_port, country)
+        print 'Connection from %s:%s to %s:%s (Country: %s)' \
+            %(local_ip, local_port, remote_ip, remote_port, country)
 
-    # Check number of process running instances
-    ins = psscan or pslist
-    possible_infections = check_instances(ins)
-    for inf in possible_infections:
-        print 'Invalid number of process instances %s' %(inf)
 
-    if not possible_infections:
-        print 'Valid number of process instances.'
-
+    # Connection diffs for winXP
     # Get connections-connscan differences
     # conns = lister(connections, 'Connections')
     # connscanner = scanner(connscan, 'ConnScan')
